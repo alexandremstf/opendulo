@@ -1,11 +1,11 @@
 #include <Arduino_FreeRTOS.h>
 #include <semphr.h>  // add the FreeRTOS functions for Semaphores (or Flags).
-#include "SparkFunMPU9250-DMP.h"
-#include "I2Cdev.h"
+
+#include "MPU9250.h"
 #include "Kalman.h"
 
-// MPU9250
-MPU9250_DMP imu_9250;
+MPU9250 mpu1;
+
 float accelX, accelY, accelZ;
 float gyroX, gyroY, gyroZ;
 float roll, pitch;
@@ -50,15 +50,14 @@ float overshoot_angle = 30;
 float PID_angle = 8;
 float reference_angle = 0.0;
 
-void UpdateIMUData(void)
-{
-  accelX = imu_9250.calcAccel(imu_9250.ax);
-  accelY = imu_9250.calcAccel(imu_9250.ay);
-  accelZ = imu_9250.calcAccel(imu_9250.az);
-  gyroX = imu_9250.calcGyro(imu_9250.gx);
-  gyroY = imu_9250.calcGyro(imu_9250.gy);
-  gyroZ = imu_9250.calcGyro(imu_9250.gz);
-
+void UpdateIMUData(void) {
+  accelX = mpu1.getAccelerationX();
+  accelY = mpu1.getAccelerationY();
+  accelZ = mpu1.getAccelerationZ();
+  gyroX = mpu1.getGyroscopeX();
+  gyroY = mpu1.getGyroscopeY();
+  gyroZ = mpu1.getGyroscopeZ();
+  
   // Convert to deg/s
   roll = atan(accelY / sqrt(pow(accelX, 2) + pow(accelZ, 2))) * rad_to_reg;
   pitch = atan(-1 * accelX / sqrt(pow(accelY, 2) + pow(accelZ, 2))) * rad_to_reg;
@@ -149,15 +148,7 @@ void setup() {
   xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 2, NULL );
   xTaskCreate(readSensor, (const portCHAR *)"Control", 128, NULL, 1, NULL );
 
-  // MPU-9250
-  if (imu_9250.begin() != INV_SUCCESS)
-  {
-    imu_9250.setSensors(INV_XYZ_GYRO | INV_XYZ_ACCEL);// Enable all sensors:
-    imu_9250.setGyroFSR(2000); // Set gyro to 2000 dps
-    imu_9250.setAccelFSR(2); // Set accel to +/-2g
-    imu_9250.setLPF(5); // Set LPF corner frequency to 5Hz
-    imu_9250.setSampleRate(10); // Set sample rate to 10Hz
-  }
+  mpu1.init(0x69, 0x0C);
 
   // Timer
   pas_time = millis();
@@ -169,13 +160,11 @@ void loop() {
   dif_time = (now_time - pas_time) / 1000; // in seconds. We work in ms so we haveto divide the value by 1000
   pas_time = now_time;
 
-  // Update IMU data
-  if ( imu_9250.dataReady() )
-  {
-    imu_9250.update(UPDATE_ACCEL | UPDATE_GYRO | UPDATE_COMPASS);
-    UpdateIMUData();
-    kalman();
-  }
+  mpu1.read();
+  UpdateIMUData();
+  kalman();
+
+
 }
 
 void control(void *pvParameters) {
@@ -183,9 +172,9 @@ void control(void *pvParameters) {
 
   for (;;) {
     forward();
-  
-    OCR1A = pwm2;
-    OCR1B = pwm1;
+
+    analogWrite(PWM_MOTOR1, pwm1);
+    analogWrite(PWM_MOTOR2, pwm2);
     
     vTaskDelay( 1000 / portTICK_PERIOD_MS );
 
