@@ -1,54 +1,4 @@
-#include <Arduino_FreeRTOS.h>
-#include <semphr.h>  // add the FreeRTOS functions for Semaphores (or Flags).
-
-#include "MPU9250.h"
-#include "Kalman.h"
-
-MPU9250 mpu1;
-
-float accelX, accelY, accelZ;
-float gyroX, gyroY, gyroZ;
-float roll, pitch;
-float gyroXrate, gyroYrate;
-float rad_to_reg = 180 / 3.141592654;
-
-// Kalman Filter
-Kalman kalmanX;
-Kalman kalmanY;
-double gyroXangle, gyroYangle; // Gyroscope angle
-double compAngleX, compAngleY; // Complementary filter angle
-double kalAngleX, kalAngleY; // Angle after Kalman filter
-double corrected_x, corrected_y; // Corrected with offset
-const byte AIN2 = 4;
-const byte AIN1 = 5;
-const byte STBY = 6;
-const byte BIN1 = 7;
-const byte BIN2 = 8;
-const byte PWM_MOTOR1 = 9;
-const byte PWM_MOTOR2 = 10;
-
-// Timer
-float now_time;
-float pas_time;
-float dif_time;
-
-// PID
-float kp = 22;// 10.1 18
-float ki = 0.4;// 0.3
-float kd = 20;// 9.3 16
-float kp_error = 0.0;
-float ki_error = 0.0;
-float kd_error = 0.0;
-float kp_pass_error = 0.0;
-float kp_result = 0;
-float ki_result = 0;
-float kd_result = 0;
-float final_result = 0;
-
-// Special angle
-float overshoot_angle = 30;
-float PID_angle = 8;
-float reference_angle = 0.0;
+#include "segway_freeRTOS.h"
 
 void UpdateIMUData(void) {
   accelX = mpu1.getAccelerationX();
@@ -91,15 +41,17 @@ float pid_control() { // ONLY PD RIGHT NOW
 void kalman() {
   if ((roll < -90 && kalAngleX > 90) || (roll > 90 && kalAngleX < -90)) {
     kalmanX.setAngle(roll);
-    compAngleX = roll;
     kalAngleX = roll;
     gyroXangle = roll;
+  
   } else {
     kalAngleX = kalmanX.getAngle(roll, gyroXrate, dif_time); // Calculate the angle using a Kalman filter
   }
+  
   if (abs(kalAngleX) > 90) {
     gyroYrate = -gyroYrate; // Invert rate, so it fits the restriced accelerometer reading
   }
+  
   kalAngleY = kalmanY.getAngle(pitch, gyroYrate, dif_time);
   gyroXangle += gyroXrate * dif_time; // Calculate gyro angle without any filter
   gyroYangle += gyroYrate * dif_time;
@@ -154,17 +106,20 @@ void setup() {
   pas_time = millis();
 }
 
-void loop() {
-  // calculate time
-  now_time = millis();
-  dif_time = (now_time - pas_time) / 1000; // in seconds. We work in ms so we haveto divide the value by 1000
-  pas_time = now_time;
+int main() {
 
-  mpu1.read();
-  UpdateIMUData();
-  kalman();
+  setup();
 
+  while(1) {
+    // calculate time
+    now_time = millis();
+    dif_time = (now_time - pas_time) / 1000;
+    pas_time = now_time;
 
+    mpu1.read();
+    UpdateIMUData();
+    kalman();
+  }
 }
 
 void control(void *pvParameters) {
