@@ -13,11 +13,7 @@ void UpdateIMUData(void) {
 }
 
 float pid_control() { // ONLY PD RIGHT NOW
-  kp_error = kalAngleY - reference_angle;
-
-  // If the car is about to fall down, adjust it quickly
-  if (kp_error >= overshoot_angle && kp_error <= -overshoot_angle) {kp = 40;}
-  else {kp = 22;}
+  kp_error = compAngleY - reference_angle;
 
   ki_error += kp_error * dif_time;
   kd_error = (kp_error - kp_pass_error) / dif_time;
@@ -27,27 +23,23 @@ float pid_control() { // ONLY PD RIGHT NOW
   kp_pass_error = kp_error;
   final_result = kp_result + kd_result;
 
-  // PID only invoided when angle is small
-  if (kp_error <= PID_angle && kp_error >= -PID_angle) {
-    final_result = kp_result + kd_result + ki_result;
+  float max = 100;
+  if(final_result > max){
+    final_result = max;
   }
-
+  if(final_result < -max){
+    final_result = -max;
+  }
+  
   return final_result;
 }
 
 void kalman() {
   kalAngleY = kalmanY.getAngle(pitch, gyroYrate, dif_time);
   gyroYangle += gyroYrate * dif_time;
-  compAngleY = 0.5 * (compAngleY + gyroYrateComp * dif_time) + 0.5 * pitch;
   
-  Serial.print("Kalman: ");
-  Serial.print(kalAngleY);
-  Serial.print("- Comp: ");
-  Serial.println(compAngleY);   
+  compAngleY = 0.5 * (compAngleY + gyroYrateComp * dif_time) + 0.5 * pitch;  
 }
-
-int pwm1 = 0;
-int pwm2 = 0;
 
 // Declare a mutex Semaphore Handle which we will use to manage the sensor data.
 // It will be used to ensure only only one Task is accessing this resource at any time.
@@ -79,8 +71,8 @@ void setup() {
       xSemaphoreGive( ( angleSemaphore ) );  // Make the angle available for use, by "Giving" the Semaphore.
   }
 
-  xTaskCreate(readSensor, (const portCHAR *)"readSensor", 128, NULL, 1, NULL ); // Higher frequency, lower priority
-  xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 3, NULL ); // Higher priority, lower frequency
+  xTaskCreate(readSensor, (const portCHAR *)"readSensor", 128, NULL, 1, NULL );
+  xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 1, NULL );
   
 
   // Timer
@@ -95,34 +87,36 @@ void control(void *pvParameters) {
   (void) pvParameters;
   
   TickType_t xLastWakeTime;
-  const TickType_t xFrequency = 2;
+  const TickType_t xFrequency = 1;
   //pdMS_TO_TICKS(100) Converte tempo em ms para ticks
   // 1 TICK = 16ms
 
   //Initialise the xLastWakeTime variable with the current time.
   xLastWakeTime = xTaskGetTickCount();
 
+  int controlSignal = 0;
+  
   for (;;) {
     // Wait for the next cycle.
     vTaskDelayUntil( &xLastWakeTime, xFrequency );
     
-    //forward();
+    //Wait
+    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE ){
+      
+      controlSignal = pid_control();
+      //Serial.print("Controle: ");
+      Serial.println(controlSignal);
+     
+      if(compAngleY > 70){
+        forward();
+      }else{
+        back();
+      }
 
-    //analogWrite(PWM_MOTOR1, pwm1);
-    //analogWrite(PWM_MOTOR2, pwm2);
-  
-
-    // See if we can obtain or "Take" the Angle Semaphore.
-    // If the semaphore is not available, wait 5 ticks of the Scheduler to see if it becomes free.
-    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE )
-    {
-      Serial.println(" Controle: ");
-      now_time1 = millis();
-      dif_time1 = (now_time1 - pas_time1) / 1000;
-      Serial.println(dif_time1);
-      pas_time1 = now_time1;
-      //Serial.print(pid_control());
-      xSemaphoreGive( angleSemaphore ); // Now free or "Give" the Serial Port for others.
+      analogWrite(PWM_MOTOR1, abs(controlSignal));
+      analogWrite(PWM_MOTOR2, abs(controlSignal));
+      
+      xSemaphoreGive( angleSemaphore ); //Signal
     }
   }
 }
@@ -140,26 +134,26 @@ void readSensor(void *pvParameters){
 
   for (;;) {
     // Wait for the next cycle.
-    vTaskDelayUntil( &xLastWakeTime, xFrequency );
+    vTaskDelayUntil( &xLastWakeTime, xFrequency);
       
-    // See if we can obtain or "Take" the Angle Semaphore.
-    // If the semaphore is not available, wait 5 ticks of the Scheduler to see if it becomes free.
-    //Serial.println("Fora");
-        
-    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE )
-    {
-      Serial.println(" Leitura: ");
+    //Wait
+    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE ){
+      //Serial.print(" Leitura: ");
       now_time = millis();
       dif_time = (now_time - pas_time) / 1000;
-      Serial.println(dif_time);
-      pas_time = now_time;
-////    
-////      mpu1.read();
-////      mpu2.read();
-////      UpdateIMUData();
-////      kalman();
-//
-      xSemaphoreGive( angleSemaphore ); // Now free or "Give" the Serial Port for others.
+      //Serial.println(dif_time);
+      pas_time = now_time;    
+      mpu1.read();
+      mpu2.read();
+      UpdateIMUData();
+      kalman();
+     
+//      Serial.print("Kalman: ");
+//      Serial.println(kalAngleY);
+//      Serial.print("- Comp: ");
+//      Serial.println(compAngleY); 
+      
+      xSemaphoreGive( angleSemaphore ); //Signal
     }
   }
 }

@@ -52,13 +52,12 @@ void MPU9250::I2CwriteByte(uint8_t Address, uint8_t Register, uint8_t Data) {
 void MPU9250::read() {
     I2Cread(MPU9250_ADDRESS, 0x3B, 14, buffer);
 
-    // Read magnetometer data
-    uint8_t ST1;
-    do {
-        I2Cread(MAG_ADDRESS, 0x02, 1, &ST1);
-    } while (!(ST1 & 0x01));
-
-    I2Cread(MAG_ADDRESS, 0x03, 7, buffer_magnetometer);
+//    // Read magnetometer data
+//    uint8_t ST1;
+//    do {
+//        I2Cread(MAG_ADDRESS, 0x02, 1, &ST1);
+//    } while (!(ST1 & 0x01));
+//    I2Cread(MAG_ADDRESS, 0x03, 7, buffer_magnetometer);
 }
 
 int16_t MPU9250::getAccelerationX() {
