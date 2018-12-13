@@ -35,6 +35,10 @@ float now_time;
 float pas_time;
 float dif_time;
 
+float now_time1;
+float pas_time1;
+float dif_time1;
+
 // PID
 float kp = 22;// 10.1 18
 float ki = 0.4;// 0.3

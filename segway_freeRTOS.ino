@@ -51,11 +51,12 @@ int pwm2 = 0;
 
 // Declare a mutex Semaphore Handle which we will use to manage the sensor data.
 // It will be used to ensure only only one Task is accessing this resource at any time.
-//SemaphoreHandle_t angleSemaphore;
+SemaphoreHandle_t angleSemaphore;
+
 //
-//// define two Tasks for Control & Sensor Read
-//void control( void *pvParameters );
-//void readSensor( void *pvParameters );
+//Define two Tasks for Control & Sensor Read
+void control( void *pvParameters );
+void readSensor( void *pvParameters );
 
 void setup() {  
   Serial.begin(115000);
@@ -68,70 +69,98 @@ void setup() {
   pinMode(PWM_MOTOR2, OUTPUT);
   pinMode(PWM_MOTOR1, OUTPUT);
 
-//  if ( angleSemaphore == NULL )  // Check to confirm that the Angle Semaphore has not already been created.
-//  {
-//    angleSemaphore = xSemaphoreCreateMutex();  // Create a mutex semaphore we will use to manage the Angle
-//    if ( ( angleSemaphore ) != NULL )
-//      xSemaphoreGive( ( angleSemaphore ) );  // Make the angle available for use, by "Giving" the Semaphore.
-//  }
-
-  //xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 2, NULL );
-  //xTaskCreate(readSensor, (const portCHAR *)"Control", 128, NULL, 1, NULL );
-
   mpu1.init(0x68, 0x0C);
   mpu2.init(0x69, 0x0C);
 
+  if ( angleSemaphore == NULL )  // Check to confirm that the Angle Semaphore has not already been created.
+  {
+    angleSemaphore = xSemaphoreCreateBinary();  // Create a binary semaphore we will use to manage the Angle
+    if ( ( angleSemaphore ) != NULL )
+      xSemaphoreGive( ( angleSemaphore ) );  // Make the angle available for use, by "Giving" the Semaphore.
+  }
+
+  xTaskCreate(readSensor, (const portCHAR *)"readSensor", 128, NULL, 1, NULL ); // Higher frequency, lower priority
+  xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 3, NULL ); // Higher priority, lower frequency
+  
+
   // Timer
   pas_time = millis();
+  pas_time1 = millis();
 }
 
 void loop() {
-  // calculate time
-  now_time = millis();
-  dif_time = (now_time - pas_time) / 1000;
-  pas_time = now_time;
-
-  mpu1.read();
-  mpu2.read();
-  UpdateIMUData();
-  kalman();
- 
 }
 
 void control(void *pvParameters) {
   (void) pvParameters;
+  
+  TickType_t xLastWakeTime;
+  const TickType_t xFrequency = 2;
+  //pdMS_TO_TICKS(100) Converte tempo em ms para ticks
+  // 1 TICK = 16ms
+
+  //Initialise the xLastWakeTime variable with the current time.
+  xLastWakeTime = xTaskGetTickCount();
 
   for (;;) {
+    // Wait for the next cycle.
+    vTaskDelayUntil( &xLastWakeTime, xFrequency );
+    
     //forward();
 
-    analogWrite(PWM_MOTOR1, pwm1);
-    analogWrite(PWM_MOTOR2, pwm2);
-    
-    vTaskDelay( 1000 / portTICK_PERIOD_MS );
+    //analogWrite(PWM_MOTOR1, pwm1);
+    //analogWrite(PWM_MOTOR2, pwm2);
+  
 
     // See if we can obtain or "Take" the Angle Semaphore.
     // If the semaphore is not available, wait 5 ticks of the Scheduler to see if it becomes free.
-//    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 5 ) == pdTRUE )
-//    {
-//      // getAngle
-//      xSemaphoreGive( angleSemaphore ); // Now free or "Give" the Serial Port for others.
-//    }
+    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE )
+    {
+      Serial.println(" Controle: ");
+      now_time1 = millis();
+      dif_time1 = (now_time1 - pas_time1) / 1000;
+      Serial.println(dif_time1);
+      pas_time1 = now_time1;
+      //Serial.print(pid_control());
+      xSemaphoreGive( angleSemaphore ); // Now free or "Give" the Serial Port for others.
+    }
   }
 }
 
 void readSensor(void *pvParameters){
   (void) pvParameters;
 
-  for (;;) {
-    vTaskDelay(1);
+  TickType_t xLastWakeTime;
+  const TickType_t xFrequency = 1;
+  //pdMS_TO_TICKS(100) Converte tempo em ms para ticks
+  // 1 TICK = 16ms
 
+  //Initialise the xLastWakeTime variable with the current time.
+  xLastWakeTime = xTaskGetTickCount();
+
+  for (;;) {
+    // Wait for the next cycle.
+    vTaskDelayUntil( &xLastWakeTime, xFrequency );
+      
     // See if we can obtain or "Take" the Angle Semaphore.
     // If the semaphore is not available, wait 5 ticks of the Scheduler to see if it becomes free.
-//    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 5 ) == pdTRUE )
-//    {
-//      // setAngle
-//      xSemaphoreGive( angleSemaphore ); // Now free or "Give" the Serial Port for others.
-//    }
+    //Serial.println("Fora");
+        
+    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE )
+    {
+      Serial.println(" Leitura: ");
+      now_time = millis();
+      dif_time = (now_time - pas_time) / 1000;
+      Serial.println(dif_time);
+      pas_time = now_time;
+////    
+////      mpu1.read();
+////      mpu2.read();
+////      UpdateIMUData();
+////      kalman();
+//
+      xSemaphoreGive( angleSemaphore ); // Now free or "Give" the Serial Port for others.
+    }
   }
 }
 
