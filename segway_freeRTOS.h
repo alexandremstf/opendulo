@@ -6,11 +6,12 @@
 
 
 MPU9250 mpu1;
+MPU9250 mpu2;
 
 float accelX, accelY, accelZ;
 float gyroX, gyroY, gyroZ;
 float roll, pitch;
-float gyroXrate, gyroYrate;
+float gyroYrate, gyroYrateComp;
 float rad_to_reg = 180 / 3.141592654;
 
 Kalman kalmanX;

@@ -15,7 +15,7 @@ void MPU9250::init(int8_t mpu_address, int8_t magnetometer_adress) {
     I2CwriteByte(MPU9250_ADDRESS, 26, 0x06);
 
     // Configure gyroscope range
-    I2CwriteByte(MPU9250_ADDRESS, 27, GYRO_FULL_SCALE_1000_DPS);
+    I2CwriteByte(MPU9250_ADDRESS, 27, GYRO_FULL_SCALE_2000_DPS);
     // Configure accelerometers range
     I2CwriteByte(MPU9250_ADDRESS, 28, ACC_FULL_SCALE_4_G);
     // Set by pass mode for the magnetometers
