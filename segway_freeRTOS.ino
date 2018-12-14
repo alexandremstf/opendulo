@@ -27,7 +27,6 @@ void setup() {
   
   // Timer
   pas_time = millis();
-  pas_time1 = millis();
 }
 
 void loop() {
