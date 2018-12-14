@@ -23,24 +23,13 @@ void setup() {
   }
 
   xTaskCreate(readSensor, (const portCHAR *)"readSensor", 128, NULL, 1, NULL );
-  //xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 2, NULL );
+  xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 1, NULL );
   
   // Timer
   pas_time = millis();
 }
 
 void loop() {
-//  now_time = millis();
-//  dif_time = (now_time - pas_time) / 1000;
-//  pas_time = now_time;
-//  
-//  mpu1.read();
-//  mpu2.read();
-//  updateValues();
-//  kalman();
-//  
-//  Serial.println(compAngleY);
-//  delay(10);
 }
 
 void control(void *pvParameters) {
@@ -96,9 +85,7 @@ void readSensor(void *pvParameters){
       updateValues();
       kalman();
 
-      Serial.println(compAngleY);
-      delay(10);
-      
+      //Serial.println(compAngleY);
       xSemaphoreGive( angleSemaphore ); // signal
     }
   }
