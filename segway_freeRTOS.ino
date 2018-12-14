@@ -104,8 +104,9 @@ float calculateAngle() {
   
   float pitch = atan(-1 * accel_x / sqrt(pow(accel_y, 2) + pow(accel_z, 2))) * (180.0 / 3.141592);
 
+  float angle_y = kalman.getAngle(pitch, gyro_y, dt);
 
-  float angle_y = 0.95 * (last_angle_y + gyro_y * dt) + 0.05 * pitch; 
+  //float angle_y = 0.95 * (last_angle_y + gyro_y * dt) + 0.05 * pitch; 
   last_angle_y = angle_y;
   
   //Serial.println(angle_y);
