@@ -12,9 +12,9 @@
 #define PWM_MOTOR1 11
 #define PWM_MOTOR2 3
 
-#define KP 2.0
-#define KI 20.0
-#define KD 0.05
+#define KP 0.8
+#define KI 12.0
+#define KD 0.06
 
 SemaphoreHandle_t angleSemaphore;
 

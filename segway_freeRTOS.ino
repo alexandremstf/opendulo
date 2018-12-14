@@ -53,9 +53,9 @@ void control(void *pvParameters) {
     vTaskDelayUntil( &xLastWakeTime, xFrequency );
     
     if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 2 ) == pdTRUE ){
-      
-      controlSignal = pid(angle_robot, -2 );
-      
+   
+      controlSignal = pid(angle_robot, -2.65 );
+        
       if (controlSignal > 0) forward();
       if (controlSignal < 0) back();
 
@@ -108,9 +108,9 @@ float calculateAngle() {
 
   float angle_y = 0.95 * (last_angle_y + gyro_y * dt) + 0.05 * pitch; 
   last_angle_y = angle_y;
-  
-  Serial.println(angle_y);
 
+  //Serial.println(angle_y);
+  
   return angle_y;
 }
 
@@ -127,6 +127,9 @@ float pid(float setpoint, float input) {
   integral += error * dt;  
   last_error = error;
 
+  if (integral > 5) integral = 5;
+  if (integral < -5) integral = -5;
+ 
   float output = KP * (error) + KI * (integral) + KD * (derivative);
   
   float max = 100;
