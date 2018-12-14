@@ -1,2 +1,2 @@
-# Self-balance-ardiuno-car
-Using Ardiuno Uno combined with MPU9250
+# Segway-ardiuno-FreeRTOS
+Using Ardiuno Uno combined with FreeRTOS and two MPU9250
