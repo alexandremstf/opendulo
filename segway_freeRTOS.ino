@@ -1,7 +1,7 @@
 #include "segway_freeRTOS.h"
 
 void setup() {  
-  //Serial.begin(115200);
+  Serial.begin(115200);
 
   pinMode(AIN2, OUTPUT);
   pinMode(AIN1, OUTPUT);
@@ -54,7 +54,7 @@ void control(void *pvParameters) {
     
     if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 2 ) == pdTRUE ){
       
-      controlSignal = pid(angle_robot, 0);
+      controlSignal = pid(angle_robot, -2 );
       
       if (controlSignal > 0) forward();
       if (controlSignal < 0) back();
@@ -104,12 +104,12 @@ float calculateAngle() {
   
   float pitch = atan(-1 * accel_x / sqrt(pow(accel_y, 2) + pow(accel_z, 2))) * (180.0 / 3.141592);
 
-  float angle_y = kalman.getAngle(pitch, gyro_y, dt);
+  //float angle_y = kalman.getAngle(pitch, gyro_y/131.0, dt);
 
-  //float angle_y = 0.95 * (last_angle_y + gyro_y * dt) + 0.05 * pitch; 
+  float angle_y = 0.95 * (last_angle_y + gyro_y * dt) + 0.05 * pitch; 
   last_angle_y = angle_y;
   
-  //Serial.println(angle_y);
+  Serial.println(angle_y);
 
   return angle_y;
 }
@@ -129,7 +129,7 @@ float pid(float setpoint, float input) {
 
   float output = KP * (error) + KI * (integral) + KD * (derivative);
   
-  float max = 50;
+  float max = 100;
   if (output > max) output = max;
   if (output < -max) output = -max;
 
