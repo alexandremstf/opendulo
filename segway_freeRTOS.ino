@@ -1,9 +1,7 @@
 #include "segway_freeRTOS.h"
 
-SemaphoreHandle_t angleSemaphore;
-
 void setup() {  
-  Serial.begin(115200);
+  //Serial.begin(115200);
 
   pinMode(AIN2, OUTPUT);
   pinMode(AIN1, OUTPUT);
@@ -24,12 +22,21 @@ void setup() {
 
   xTaskCreate(readSensor, (const portCHAR *)"readSensor", 128, NULL, 1, NULL );
   xTaskCreate(control, (const portCHAR *)"Control", 128, NULL, 1, NULL );
-  
-  // Timer
-  pas_time = millis();
 }
 
 void loop() {
+//  mpu1.read();
+//  mpu2.read();
+//  
+//  angle_robot = calculateAngle();
+//
+//  float controlSignal = pid(angle_robot, 0);
+//      
+//  if (controlSignal > 0) forward();
+//  if (controlSignal < 0) back();
+//
+//  analogWrite(PWM_MOTOR1, abs(controlSignal));
+//  analogWrite(PWM_MOTOR2, abs(controlSignal));
 }
 
 void control(void *pvParameters) {
@@ -45,15 +52,12 @@ void control(void *pvParameters) {
   for (;;) {
     vTaskDelayUntil( &xLastWakeTime, xFrequency );
     
-    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE ){
+    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 2 ) == pdTRUE ){
       
-      controlSignal = pid_control();
+      controlSignal = pid(angle_robot, 0);
       
-      if(compAngleY > 70){
-        forward();
-      }else{
-        back();
-      }
+      if (controlSignal > 0) forward();
+      if (controlSignal < 0) back();
 
       analogWrite(PWM_MOTOR1, abs(controlSignal));
       analogWrite(PWM_MOTOR2, abs(controlSignal));
@@ -74,60 +78,61 @@ void readSensor(void *pvParameters){
   for (;;) {
     vTaskDelayUntil( &xLastWakeTime, xFrequency);
       
-    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 1 ) == pdTRUE ){
-      now_time = millis();
-      dif_time = (now_time - pas_time) / 1000;
-      pas_time = now_time;
+    if ( xSemaphoreTake( angleSemaphore, ( TickType_t ) 2 ) == pdTRUE ){
       
       mpu1.read();
       mpu2.read();
       
-      updateValues();
-      kalman();
-
-      //Serial.println(compAngleY);
+      angle_robot = calculateAngle();
+      
       xSemaphoreGive( angleSemaphore ); // signal
     }
   }
 }
 
-void updateValues(void) {
-  accelX = ((mpu1.getAccelerationX() + mpu2.getAccelerationX())/2);
-  accelY = ((mpu1.getAccelerationY() + mpu2.getAccelerationY())/2);
-  accelZ = ((mpu1.getAccelerationZ() + mpu2.getAccelerationZ())/2);
-  gyroY = ((mpu1.getGyroscopeY() + mpu2.getGyroscopeY())/2);
+float calculateAngle() {
+  // cálculo do dt para achar o ângulo
+  float t = millis();
+  float dt = (t - last_angle_time) / 1000;
+  last_angle_time = t;
 
-  pitch = atan(-1 * accelX / sqrt(pow(accelY, 2) + pow(accelZ, 2))) * rad_to_reg;
-  gyroYrate = gyroY / 131.0;
-  gyroYrateComp = gyroYrate;
-}
-
-void kalman() {
-  kalAngleY = kalmanY.getAngle(pitch, gyroYrate, dif_time);
-  gyroYangle += gyroYrate * dif_time;
-  compAngleY = 0.5 * (compAngleY + gyroYrateComp * dif_time) + 0.5 * pitch;  
-}
-
-float pid_control() { // ONLY PD RIGHT NOW
-  kp_error = compAngleY - reference_angle;
-
-  ki_error += kp_error * dif_time;
-  kd_error = (kp_error - kp_pass_error) / dif_time;
-  kp_result = kp_error * kp;
-  ki_result = ki_error * ki;
-  kd_result = kd_error * kd;
-  kp_pass_error = kp_error;
-  final_result = kp_result + kd_result;
-
-  float max = 100;
-  if(final_result > max){
-    final_result = max;
-  }
-  if(final_result < -max){
-    final_result = -max;
-  }
+  // média entre leituras dos sensores
+  float accel_x = ((mpu1.getAccelerationX() + mpu2.getAccelerationX())/2);
+  float accel_y = ((mpu1.getAccelerationY() + mpu2.getAccelerationY())/2);
+  float accel_z = ((mpu1.getAccelerationZ() + mpu2.getAccelerationZ())/2);
+  float gyro_y = ((mpu1.getGyroscopeY() + mpu2.getGyroscopeY())/2);
   
-  return final_result;
+  float pitch = atan(-1 * accel_x / sqrt(pow(accel_y, 2) + pow(accel_z, 2))) * (180.0 / 3.141592);
+
+
+  float angle_y = 0.95 * (last_angle_y + gyro_y * dt) + 0.05 * pitch; 
+  last_angle_y = angle_y;
+  
+  //Serial.println(angle_y);
+
+  return angle_y;
+}
+
+float pid(float setpoint, float input) {
+
+  // cálculo do dt para controle
+  float t = millis();
+  float dt = (t - last_pid_time) / 1000;
+  last_pid_time = t;
+
+  float error = (setpoint - input);
+  float derivative = (error - last_error) / dt;
+  
+  integral += error * dt;  
+  last_error = error;
+
+  float output = KP * (error) + KI * (integral) + KD * (derivative);
+  
+  float max = 50;
+  if (output > max) output = max;
+  if (output < -max) output = -max;
+
+  return output;
 }
 
 void forward() {
