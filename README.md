@@ -1,2 +1,2 @@
-# Segway-ardiuno-FreeRTOS
-Using Ardiuno Uno combined with FreeRTOS and two MPU9250
+# Open-dulo
+Projeto open-source de uma plataforma robótica de ensino para controle. 
